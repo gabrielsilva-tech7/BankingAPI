@@ -99,6 +99,14 @@ Resultado atual:
 15 passed
 ```
 
+## 🌐 API Online
+
+A BankingAPI está publicada e pode ser testada através da documentação interativa do Swagger:
+
+**Swagger:** https://bankingapi-production-db1d.up.railway.app/docs
+
+Através do Swagger é possível testar os endpoints de cadastro, autenticação e operações bancárias diretamente pelo navegador.
+
 ## ▶️ Como executar o projeto
 
 Clone o repositório:
