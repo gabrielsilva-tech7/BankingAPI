@@ -1,14 +1,44 @@
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 
 client = TestClient(app)
 
 
+def headers(token):
+    return {
+        "Authorization": f"Bearer {token}"
+    }
+
+
+def criar_cliente(nome, cpf, email, senha="Teste123"):
+    return client.post(
+        "/clientes",
+        json={
+            "nome": nome,
+            "cpf": cpf,
+            "email": email,
+            "senha": senha
+        }
+    )
+
+
+def fazer_login(email, senha="Teste123"):
+    return client.post(
+        "/auth/login",
+        json={
+            "email": email,
+            "senha": senha
+        }
+    )
+
+
 def test_inicio():
     response = client.get("/")
 
     assert response.status_code == 200
+
     assert response.json() == {
         "mensagem": "Banking API funcionando"
     }
@@ -22,7 +52,7 @@ def test_me_sem_token():
 
 def test_login_invalido():
     response = client.post(
-        "/login",
+        "/auth/login",
         json={
             "email": "naoexiste@teste.com",
             "senha": "Senha123"
@@ -30,6 +60,7 @@ def test_login_invalido():
     )
 
     assert response.status_code == 401
+
     assert response.json() == {
         "detail": "Email ou senha incorretos"
     }
@@ -64,17 +95,13 @@ def test_cadastro_cpf_invalido():
 
 
 def test_criar_cliente():
-    response = client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Pytest",
-            "cpf": "52998224725",
-            "email": "pytest@teste.com",
-            "senha": "Teste123"
-        }
+    response = criar_cliente(
+        "Cliente Pytest",
+        "52998224725",
+        "pytest@teste.com"
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
 
     dados = response.json()
 
@@ -85,22 +112,14 @@ def test_criar_cliente():
 
 
 def test_login_valido():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Login",
-            "cpf": "11144477735",
-            "email": "login@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Login",
+        "11144477735",
+        "login@teste.com"
     )
 
-    response = client.post(
-        "/login",
-        json={
-            "email": "login@teste.com",
-            "senha": "Teste123"
-        }
+    response = fazer_login(
+        "login@teste.com"
     )
 
     assert response.status_code == 200
@@ -112,31 +131,21 @@ def test_login_valido():
 
 
 def test_me_com_token():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Token",
-            "cpf": "93541134780",
-            "email": "token@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Token",
+        "93541134780",
+        "token@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "token@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "token@teste.com"
     )
 
     token = login.json()["access_token"]
 
     response = client.get(
         "/me",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     assert response.status_code == 200
@@ -144,66 +153,46 @@ def test_me_com_token():
 
 
 def test_criar_conta():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Conta",
-            "cpf": "39053344705",
-            "email": "conta@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Conta",
+        "39053344705",
+        "conta@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "conta@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "conta@teste.com"
     )
 
     token = login.json()["access_token"]
 
     response = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
 
     dados = response.json()
 
-    assert dados["saldo"] == "0.00" or float(dados["saldo"]) == 0.0
+    assert float(dados["saldo"]) == 0.0
 
 
 def test_deposito():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Deposito",
-            "cpf": "86288366757",
-            "email": "deposito@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Deposito",
+        "86288366757",
+        "deposito@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "deposito@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "deposito@teste.com"
     )
 
     token = login.json()["access_token"]
 
     conta = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     conta_id = conta.json()["id"]
@@ -214,9 +203,7 @@ def test_deposito():
             "conta_id": conta_id,
             "valor": 100.50
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     assert response.status_code == 200
@@ -224,31 +211,21 @@ def test_deposito():
 
 
 def test_saque():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Saque",
-            "cpf": "16899535009",
-            "email": "saque@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Saque",
+        "16899535009",
+        "saque@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "saque@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "saque@teste.com"
     )
 
     token = login.json()["access_token"]
 
     conta = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     conta_id = conta.json()["id"]
@@ -259,9 +236,7 @@ def test_saque():
             "conta_id": conta_id,
             "valor": 200.00
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     response = client.post(
@@ -270,9 +245,7 @@ def test_saque():
             "conta_id": conta_id,
             "valor": 50.00
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     assert response.status_code == 200
@@ -280,31 +253,21 @@ def test_saque():
 
 
 def test_saque_saldo_insuficiente():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Sem Saldo",
-            "cpf": "28001238938",
-            "email": "semsaldo@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Sem Saldo",
+        "28001238938",
+        "semsaldo@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "semsaldo@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "semsaldo@teste.com"
     )
 
     token = login.json()["access_token"]
 
     conta = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     conta_id = conta.json()["id"]
@@ -315,130 +278,106 @@ def test_saque_saldo_insuficiente():
             "conta_id": conta_id,
             "valor": 100.00
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     assert response.status_code == 400
+
     assert response.json()["detail"] == "Saldo insuficiente"
 
 
 def test_transferencia():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Origem",
-            "cpf": "31415926590",
-            "email": "origem@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Origem",
+        "31415926590",
+        "origem@teste.com"
     )
 
-    login1 = client.post(
-        "/login",
-        json={
-            "email": "origem@teste.com",
-            "senha": "Teste123"
-        }
+    login_origem = fazer_login(
+        "origem@teste.com"
     )
 
-    token1 = login1.json()["access_token"]
+    token_origem = login_origem.json()["access_token"]
 
-    conta1 = client.post(
+    conta_origem = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token1}"
-        }
+        headers=headers(token_origem)
     )
 
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Destino",
-            "cpf": "27182818205",
-            "email": "destino@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Destino",
+        "27182818205",
+        "destino@teste.com"
     )
 
-    login2 = client.post(
-        "/login",
-        json={
-            "email": "destino@teste.com",
-            "senha": "Teste123"
-        }
+    login_destino = fazer_login(
+        "destino@teste.com"
     )
 
-    token2 = login2.json()["access_token"]
+    token_destino = login_destino.json()["access_token"]
 
-    conta2 = client.post(
+    conta_destino = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token2}"
-        }
+        headers=headers(token_destino)
     )
 
-    conta1_id = conta1.json()["id"]
-    conta2_id = conta2.json()["id"]
+    conta_origem_id = conta_origem.json()["id"]
+    conta_destino_id = conta_destino.json()["id"]
 
     client.post(
         "/depositos",
         json={
-            "conta_id": conta1_id,
+            "conta_id": conta_origem_id,
             "valor": 300.00
         },
-        headers={
-            "Authorization": f"Bearer {token1}"
-        }
+        headers=headers(token_origem)
     )
 
     response = client.post(
         "/transferencias",
         json={
-            "conta_origem_id": conta1_id,
-            "conta_destino_id": conta2_id,
+            "conta_origem_id": conta_origem_id,
+            "conta_destino_id": conta_destino_id,
             "valor": 100.00
         },
-        headers={
-            "Authorization": f"Bearer {token1}"
-        }
+        headers=headers(token_origem)
     )
 
     assert response.status_code == 200
 
     dados = response.json()
 
-    assert float(dados["conta_origem"]["saldo"]) == 200.00
-    assert float(dados["conta_destino"]["saldo"]) == 100.00
+    assert float(dados["saldo"]) == 200.00
+    assert "conta_destino" not in dados
+
+    conta_destino_atualizada = client.get(
+        f"/contas/{conta_destino_id}",
+        headers=headers(token_destino)
+    )
+
+    assert conta_destino_atualizada.status_code == 200
+
+    assert float(
+        conta_destino_atualizada.json()["saldo"]
+    ) == 100.00
 
 
 def test_extrato():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Cliente Extrato",
-            "cpf": "14142135651",
-            "email": "extrato@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Cliente Extrato",
+        "14142135651",
+        "extrato@teste.com"
     )
 
-    login = client.post(
-        "/login",
-        json={
-            "email": "extrato@teste.com",
-            "senha": "Teste123"
-        }
+    login = fazer_login(
+        "extrato@teste.com"
     )
 
     token = login.json()["access_token"]
 
     conta = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     conta_id = conta.json()["id"]
@@ -449,9 +388,7 @@ def test_extrato():
             "conta_id": conta_id,
             "valor": 150.00
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     client.post(
@@ -460,16 +397,12 @@ def test_extrato():
             "conta_id": conta_id,
             "valor": 50.00
         },
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     response = client.get(
         f"/contas/{conta_id}/extrato",
-        headers={
-            "Authorization": f"Bearer {token}"
-        }
+        headers=headers(token)
     )
 
     assert response.status_code == 200
@@ -481,31 +414,21 @@ def test_extrato():
 
 
 def test_bloquear_saque_conta_alheia():
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Dono Conta",
-            "cpf": "17320508052",
-            "email": "dono@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Dono Conta",
+        "17320508052",
+        "dono@teste.com"
     )
 
-    login_dono = client.post(
-        "/login",
-        json={
-            "email": "dono@teste.com",
-            "senha": "Teste123"
-        }
+    login_dono = fazer_login(
+        "dono@teste.com"
     )
 
     token_dono = login_dono.json()["access_token"]
 
     conta = client.post(
         "/contas",
-        headers={
-            "Authorization": f"Bearer {token_dono}"
-        }
+        headers=headers(token_dono)
     )
 
     conta_id = conta.json()["id"]
@@ -516,27 +439,17 @@ def test_bloquear_saque_conta_alheia():
             "conta_id": conta_id,
             "valor": 100.00
         },
-        headers={
-            "Authorization": f"Bearer {token_dono}"
-        }
+        headers=headers(token_dono)
     )
 
-    client.post(
-        "/clientes",
-        json={
-            "nome": "Outro Cliente",
-            "cpf": "22360679767",
-            "email": "outro@teste.com",
-            "senha": "Teste123"
-        }
+    criar_cliente(
+        "Outro Cliente",
+        "22360679767",
+        "outro@teste.com"
     )
 
-    login_outro = client.post(
-        "/login",
-        json={
-            "email": "outro@teste.com",
-            "senha": "Teste123"
-        }
+    login_outro = fazer_login(
+        "outro@teste.com"
     )
 
     token_outro = login_outro.json()["access_token"]
@@ -547,9 +460,55 @@ def test_bloquear_saque_conta_alheia():
             "conta_id": conta_id,
             "valor": 10.00
         },
-        headers={
-            "Authorization": f"Bearer {token_outro}"
-        }
+        headers=headers(token_outro)
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "detail": "Conta não encontrada"
+    }
+
+
+def test_bloquear_consulta_conta_alheia():
+    criar_cliente(
+        "Dono Consulta",
+        "98765432100",
+        "donoconsulta@teste.com"
+    )
+
+    login_dono = fazer_login(
+        "donoconsulta@teste.com"
+    )
+
+    token_dono = login_dono.json()["access_token"]
+
+    conta = client.post(
+        "/contas",
+        headers=headers(token_dono)
+    )
+
+    conta_id = conta.json()["id"]
+
+    criar_cliente(
+        "Outro Consulta",
+        "01234567890",
+        "outroconsulta@teste.com"
+    )
+
+    login_outro = fazer_login(
+        "outroconsulta@teste.com"
+    )
+
+    token_outro = login_outro.json()["access_token"]
+
+    response = client.get(
+        f"/contas/{conta_id}",
+        headers=headers(token_outro)
+    )
+
+    assert response.status_code == 404
+
+    assert response.json() == {
+        "detail": "Conta não encontrada"
+    }

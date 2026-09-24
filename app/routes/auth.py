@@ -1,19 +1,18 @@
-from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
-
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 
 from app.schemas import Login
 from app.models import Cliente as ClienteModel
 from app.database import get_db
 from app.security import verificar_senha, criar_token, verificar_token
 
+
 router = APIRouter()
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
-@router.post("/login")
+@router.post("/auth/login")
 def login(
     dados: Login,
     db: Session = Depends(get_db)
@@ -22,15 +21,12 @@ def login(
         ClienteModel.email == dados.email
     ).first()
 
-    if cliente is None:
+    if cliente is None or not verificar_senha(
+        dados.senha,
+        cliente.senha_hash
+    ):
         raise HTTPException(
-            status_code=401,
-            detail="Email ou senha incorretos"
-        )
-
-    if not verificar_senha(dados.senha, cliente.senha_hash):
-        raise HTTPException(
-            status_code=401,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos"
         )
 
@@ -41,14 +37,27 @@ def login(
         "token_type": "bearer"
     }
 
+
 @router.get("/me")
 def meu_perfil(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db)
 ):
-    token = credentials.credentials
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
 
-    cliente_id = verificar_token(token)
+    cliente_id = verificar_token(
+        credentials.credentials
+    )
+
+    if cliente_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
 
     cliente = db.query(ClienteModel).filter(
         ClienteModel.id == cliente_id
@@ -56,8 +65,8 @@ def meu_perfil(
 
     if cliente is None:
         raise HTTPException(
-            status_code=404,
-            detail="Cliente não encontrado"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
         )
 
     return {

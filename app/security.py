@@ -1,42 +1,53 @@
-from pwdlib import PasswordHash
 import os
-import jwt
-
-from fastapi import HTTPException
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 
-password_hash = PasswordHash.recommended()
+import jwt
+from dotenv import load_dotenv
+from jwt.exceptions import InvalidTokenError
+from pwdlib import PasswordHash
+
 
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
+TEMPO_TOKEN_MINUTOS = 30
+
+password_hash = PasswordHash.recommended()
+
+
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY não configurada")
+
 
 def gerar_hash_senha(senha: str):
     return password_hash.hash(senha)
 
 
 def verificar_senha(senha: str, senha_hash: str):
-    return password_hash.verify(senha, senha_hash)
-
+    return password_hash.verify(
+        senha,
+        senha_hash
+    )
 
 
 def criar_token(cliente_id: int):
-    expiracao = datetime.now(timezone.utc) + timedelta(minutes=30)
+    agora = datetime.now(timezone.utc)
 
     dados = {
         "sub": str(cliente_id),
-        "exp": expiracao
+        "iat": agora,
+        "exp": agora + timedelta(
+            minutes=TEMPO_TOKEN_MINUTOS
+        )
     }
 
-    token = jwt.encode(
+    return jwt.encode(
         dados,
         SECRET_KEY,
         algorithm=ALGORITHM
     )
 
-    return token
 
 def verificar_token(token: str):
     try:
@@ -46,12 +57,12 @@ def verificar_token(token: str):
             algorithms=[ALGORITHM]
         )
 
-        cliente_id = int(dados["sub"])
+        cliente_id = dados.get("sub")
 
-        return cliente_id
+        if cliente_id is None:
+            return None
 
-    except Exception:
-        raise HTTPException(
-            status_code=401,
-            detail="Token invalido ou expirado"
-        )
+        return int(cliente_id)
+
+    except (InvalidTokenError, ValueError):
+        return None

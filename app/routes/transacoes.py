@@ -1,20 +1,35 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.schemas import Deposito, Saque, Transferencia
-from app.models import Conta as ContaModel
-from app.models import Transacao as TransacaoModel
 from app.database import get_db
 from app.dependencies import get_cliente_atual
 from app.models import Cliente as ClienteModel
+from app.models import Conta as ContaModel
+from app.models import Transacao as TransacaoModel
+from app.schemas import Deposito, Saque, Transferencia
 
 
 router = APIRouter()
 
 
-# =========================
-# DEPÓSITO
-# =========================
+def buscar_conta_do_cliente(
+    conta_id: int,
+    cliente_id: int,
+    db: Session
+):
+    conta = db.query(ContaModel).filter(
+        ContaModel.id == conta_id,
+        ContaModel.cliente_id == cliente_id
+    ).first()
+
+    if conta is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conta não encontrada"
+        )
+
+    return conta
+
 
 @router.post("/depositos")
 def depositar(
@@ -22,39 +37,30 @@ def depositar(
     db: Session = Depends(get_db),
     cliente_atual: ClienteModel = Depends(get_cliente_atual)
 ):
-    conta = db.query(ContaModel).filter(
-        ContaModel.id == deposito.conta_id
-    ).first()
-
-    if conta is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Conta não encontrada"
-        )
-
-    if conta.cliente_id != cliente_atual.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não tem permissão para depositar nesta conta"
-        )
+    conta = buscar_conta_do_cliente(
+        deposito.conta_id,
+        cliente_atual.id,
+        db
+    )
 
     conta.saldo += deposito.valor
 
-    nova_transacao = TransacaoModel(
+    transacao = TransacaoModel(
         tipo="deposito",
         conta_id=conta.id,
         valor=deposito.valor
     )
 
-    db.add(nova_transacao)
+    db.add(transacao)
     db.commit()
     db.refresh(conta)
 
-    return conta
+    return {
+        "mensagem": "Depósito realizado com sucesso",
+        "conta_id": conta.id,
+        "saldo": conta.saldo
+    }
 
-# =========================
-# SAQUE
-# =========================
 
 @router.post("/saques")
 def sacar(
@@ -62,52 +68,36 @@ def sacar(
     db: Session = Depends(get_db),
     cliente_atual: ClienteModel = Depends(get_cliente_atual)
 ):
-    if saque.valor <= 0:
-        raise HTTPException(
-            status_code=400,
-            detail="O valor do saque deve ser maior que zero"
-        )
-
-    conta = db.query(ContaModel).filter(
-        ContaModel.id == saque.conta_id
-    ).first()
-
-    if conta is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Conta não encontrada"
-        )
-
-    if conta.cliente_id != cliente_atual.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não tem permissão para sacar desta conta"
-        )
+    conta = buscar_conta_do_cliente(
+        saque.conta_id,
+        cliente_atual.id,
+        db
+    )
 
     if conta.saldo < saque.valor:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Saldo insuficiente"
         )
 
     conta.saldo -= saque.valor
 
-    nova_transacao = TransacaoModel(
+    transacao = TransacaoModel(
         tipo="saque",
         conta_id=conta.id,
         valor=saque.valor
     )
 
-    db.add(nova_transacao)
+    db.add(transacao)
     db.commit()
     db.refresh(conta)
 
-    return conta
+    return {
+        "mensagem": "Saque realizado com sucesso",
+        "conta_id": conta.id,
+        "saldo": conta.saldo
+    }
 
-
-# =========================
-# TRANSFERÊNCIA
-# =========================
 
 @router.post("/transferencias")
 def transferir(
@@ -115,47 +105,34 @@ def transferir(
     db: Session = Depends(get_db),
     cliente_atual: ClienteModel = Depends(get_cliente_atual)
 ):
-    if transferencia.valor <= 0:
+    if (
+        transferencia.conta_origem_id
+        == transferencia.conta_destino_id
+    ):
         raise HTTPException(
-            status_code=400,
-            detail="O valor da transferência deve ser maior que zero"
-        )
-
-    if transferencia.conta_origem_id == transferencia.conta_destino_id:
-        raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="A conta de origem e destino não podem ser iguais"
         )
 
-    conta_origem = db.query(ContaModel).filter(
-        ContaModel.id == transferencia.conta_origem_id
-    ).first()
+    conta_origem = buscar_conta_do_cliente(
+        transferencia.conta_origem_id,
+        cliente_atual.id,
+        db
+    )
 
     conta_destino = db.query(ContaModel).filter(
         ContaModel.id == transferencia.conta_destino_id
     ).first()
 
-    if conta_origem is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Conta de origem não encontrada"
-        )
-
-    if conta_origem.cliente_id != cliente_atual.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não tem permissão para transferir desta conta"
-        )
-
     if conta_destino is None:
         raise HTTPException(
-            status_code=404,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Conta de destino não encontrada"
         )
 
     if conta_origem.saldo < transferencia.valor:
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="Saldo insuficiente"
         )
 
@@ -174,30 +151,20 @@ def transferir(
         valor=transferencia.valor
     )
 
-    db.add(transacao_saida)
-    db.add(transacao_entrada)
+    db.add_all([
+        transacao_saida,
+        transacao_entrada
+    ])
 
     db.commit()
-
     db.refresh(conta_origem)
-    db.refresh(conta_destino)
 
     return {
         "mensagem": "Transferência realizada com sucesso",
-        "conta_origem": {
-            "id": conta_origem.id,
-            "saldo": conta_origem.saldo
-        },
-        "conta_destino": {
-            "id": conta_destino.id,
-            "saldo": conta_destino.saldo
-        }
+        "conta_origem_id": conta_origem.id,
+        "saldo": conta_origem.saldo
     }
 
-
-# =========================
-# EXTRATO
-# =========================
 
 @router.get("/contas/{conta_id}/extrato")
 def consultar_extrato(
@@ -205,24 +172,14 @@ def consultar_extrato(
     db: Session = Depends(get_db),
     cliente_atual: ClienteModel = Depends(get_cliente_atual)
 ):
-    conta = db.query(ContaModel).filter(
-        ContaModel.id == conta_id
-    ).first()
-
-    if conta is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Conta não encontrada"
-        )
-
-    if conta.cliente_id != cliente_atual.id:
-        raise HTTPException(
-            status_code=403,
-            detail="Você não tem permissão para acessar o extrato desta conta"
-        )
+    conta = buscar_conta_do_cliente(
+        conta_id,
+        cliente_atual.id,
+        db
+    )
 
     transacoes = db.query(TransacaoModel).filter(
-        TransacaoModel.conta_id == conta_id
+        TransacaoModel.conta_id == conta.id
     ).all()
 
     return {

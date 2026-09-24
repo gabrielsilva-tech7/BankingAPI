@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -6,16 +6,29 @@ from app.database import get_db
 from app.models import Cliente as ClienteModel
 from app.security import verificar_token
 
-security = HTTPBearer()
+
+security = HTTPBearer(auto_error=False)
 
 
 def get_cliente_atual(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     db: Session = Depends(get_db)
 ):
-    token = credentials.credentials
+    if credentials is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
 
-    cliente_id = verificar_token(token)
+    cliente_id = verificar_token(
+        credentials.credentials
+    )
+
+    if cliente_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
+        )
 
     cliente = db.query(ClienteModel).filter(
         ClienteModel.id == cliente_id
@@ -23,8 +36,8 @@ def get_cliente_atual(
 
     if cliente is None:
         raise HTTPException(
-            status_code=404,
-            detail="Cliente não encontrado"
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas"
         )
 
     return cliente

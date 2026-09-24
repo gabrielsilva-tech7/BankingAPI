@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
 from sqlalchemy.orm import Session
 
 from app.schemas import Cliente, ClienteResposta
@@ -10,7 +10,11 @@ from app.security import gerar_hash_senha
 router = APIRouter()
 
 
-@router.post("/clientes", response_model=ClienteResposta)
+@router.post(
+    "/clientes",
+    response_model=ClienteResposta,
+    status_code=status.HTTP_201_CREATED
+)
 def criar_cliente(
     cliente: Cliente,
     db: Session = Depends(get_db)
@@ -21,7 +25,7 @@ def criar_cliente(
 
     if cliente_existente:
         raise HTTPException(
-            status_code=409,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Email já cadastrado"
         )
 
@@ -31,7 +35,7 @@ def criar_cliente(
 
     if cpf_existente:
         raise HTTPException(
-            status_code=409,
+            status_code=status.HTTP_409_CONFLICT,
             detail="CPF já cadastrado"
         )
 

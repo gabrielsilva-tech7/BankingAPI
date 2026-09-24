@@ -4,7 +4,7 @@ API REST de um sistema bancário desenvolvida em **Python com FastAPI**, criada 
 
 A aplicação permite cadastrar clientes, autenticar usuários e realizar operações bancárias como criação de contas, depósitos, saques, transferências e consulta de extrato.
 
-## 🚀 Tecnologias utilizadas
+##  Tecnologias utilizadas
 
 - Python
 - FastAPI
@@ -16,7 +16,7 @@ A aplicação permite cadastrar clientes, autenticar usuários e realizar opera�
 - Pytest
 - HTTPX
 
-## ⚙️ Funcionalidades
+##  Funcionalidades
 
 - Cadastro de clientes
 - Validação de CPF
@@ -35,7 +35,7 @@ A aplicação permite cadastrar clientes, autenticar usuários e realizar opera�
 - Registro das transações no PostgreSQL
 - Testes automatizados
 
-## 🔐 Segurança
+##  Segurança
 
 As senhas dos usuários não são armazenadas diretamente no banco de dados.
 
@@ -43,7 +43,7 @@ A aplicação utiliza **hash de senha** e autenticação baseada em **JWT (JSON 
 
 Operações protegidas exigem autenticação, e o sistema verifica se a conta pertence ao usuário autenticado antes de permitir determinadas operações.
 
-## 🗄️ Banco de dados
+##  Banco de dados
 
 O projeto utiliza **PostgreSQL** como banco de dados principal e **SQLAlchemy** para comunicação entre a aplicação e o banco.
 
@@ -55,7 +55,7 @@ Principais entidades:
 - Contas
 - Transações
 
-## 📌 Principais endpoints
+##  Principais endpoints
 
 | Método | Endpoint | Descrição |
 |---|---|---|
@@ -69,7 +69,7 @@ Principais entidades:
 | POST | `/transferencias` | Realizar transferência |
 | GET | `/contas/{conta_id}/extrato` | Consultar extrato |
 
-## 🧪 Testes
+##  Testes
 
 O projeto possui testes automatizados utilizando **Pytest**.
 
@@ -99,7 +99,7 @@ Resultado atual:
 15 passed
 ```
 
-## 🌐 API Online
+##  API Online
 
 A BankingAPI está publicada e pode ser testada através da documentação interativa do Swagger:
 
@@ -107,7 +107,7 @@ A BankingAPI está publicada e pode ser testada através da documentação inter
 
 Através do Swagger é possível testar os endpoints de cadastro, autenticação e operações bancárias diretamente pelo navegador.
 
-## ▶️ Como executar o projeto
+##  Como executar o projeto
 
 Clone o repositório:
 
@@ -161,11 +161,11 @@ A documentação interativa estará disponível em:
 http://127.0.0.1:8001/docs
 ```
 
-## 📚 Objetivo do projeto
+##  Objetivo do projeto
 
 Este projeto foi desenvolvido para praticar conceitos utilizados no desenvolvimento backend, incluindo APIs REST, autenticação, autorização, bancos de dados relacionais, migrations, validação de dados e testes automatizados.
 
-## 👨‍💻 Autor
+##  Autor
 
 **Gabriel Silva**
 
